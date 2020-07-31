@@ -48,10 +48,10 @@ void nemo_main(void)
     line = malloc((MAX_LINELEN) * sizeof(char));
     nmax = nemo_file_lines();
 
-    dprintf(0,"MAX_LINELEN=%d\n",MAX_LINELEN);
+    /* dprintf(0,"MAX_LINELEN=%d\n",MAX_LINELEN);
     dprintf(0, "Input File: %s\n", input);
     dprintf(0, "Output File: %s\n", output);
-    dprintf(0, "Name: %s\n", usage);
+    dprintf(0, "Name: %s\n", usage); */
 
     istr = stropen(getparam("in"),"r");
     ostr = stropen(getparam("out"),"w");
