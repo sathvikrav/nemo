@@ -1,29 +1,28 @@
 /*
- * TABTRANSPOSE: transpose a matrix the lazy way
+ * TABTRANSPOSE: transpose a table the lazy way (the whole table in memory)
  *
+ *
+ *  @todo    burststring() is used, which limits # columns to 2048.  Use strtok() ?
  */
 
 #include <stdinc.h>
 #include <getparam.h>
-#include <table.h>
 #include <extstring.h>
-#include <ctype.h>
-#include <string.h>
-#include <strings.h>
+#include <table.h>
 
 string defv[] = { 
     "in=???\n           input file name(s)",
     "out=???\n          output file name",
-    "align=n\n        ask for alignment",
-    "nmax=10000\n       max space (needed if data in pipe)",
-    "VERSION=1.0\n      5-oct-02 PJT",
+    "align=f\n          align the columns?",
+    "nmax=0\n           max space (needed if data in pipe)",
+    "VERSION=1.1\n      24-jul-2020 PJT",
     NULL
 };
 
 string usage = "transpose a table";
 
 string  input, output;			/* file names */
-bool alignment;           /* determines if tabtranspose should/shouldn't align */
+bool alignment;                         /* align the columns ?*/
 stream  instr, outstr;			/* file streams */
 int     nmax;                           /* # lines in file */
 int     kmin;                           /* # columns to transpsse */
@@ -31,12 +30,14 @@ int     kmin;                           /* # columns to transpsse */
 string *lines;               /* pointer to all lines */
 string **words;              /* pointer to all words */
 
-local void setparams(void), do_work(), do_output();
+local void setparams(void);
+local void do_work(void);
+local void do_output(void);
 
 extern  string *burststring(string, string);
 
 
-nemo_main()
+void nemo_main(void)
 {
     setparams();
     do_work();
@@ -56,22 +57,27 @@ local void setparams(void)
     alignment = getbparam("align");
 
     nmax = nemo_file_lines(input,getiparam("nmax"));
+    
     lines = (string *) allocate (nmax * sizeof(string));
     words = (string **) allocate (nmax * sizeof(string *));
 }
 
-local void do_work()
+local void do_work(void)
 {
   int k, n=0;
 
   kmin = -1;    /* keep track of min number of columns */
 
-  while ( (n < nmax) && (lines[n] = getaline(instr)) != NULL) {
+  while ( (lines[n] = getaline(instr)) != NULL) {
+    if (n == nmax) {
+      warning("Too many lines, change nmax=");
+      break;
+    }
     if (*lines[n] == '#') continue;
     words[n] = burststring(lines[n]," ,\t");
     k = xstrlen(words[n],sizeof(string))-1;
     kmin = (kmin < 0 ?  k :  MIN(kmin,k));
-    dprintf(0,"%d: %s\n",k, lines[n]);
+    dprintf(2,"%d: %s\n",k, lines[n]);
     n++;
   }
 
@@ -79,15 +85,15 @@ local void do_work()
   dprintf(0,"Read %d lines, %d columns to be transposed\n",n,kmin);
 }
 
-local void do_output()
+local void do_output(void)
 {
   int i, j, max_spaces = 0, count_spaces;
   int max_space[nmax];
 
   if (alignment) {
-    dprintf(0, "The alignment parameter is true\n"); 
+    dprintf(1, "The alignment parameter is true\n"); 
   } else {
-    dprintf(0, "The alignment parameter is false\n");
+    dprintf(1, "The alignment parameter is false\n");
   }
 
   if (alignment) {
