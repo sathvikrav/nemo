@@ -64,7 +64,7 @@ local int nemoinprt(char *line, real *par, int npar)
   //     *  0  *  0
   char *token = strtok(line," ,");
   int ntok = 0;
-  lls *curr, *prev = NULL;
+  lls *curr, *prev = NULL, *start, *end;
   real *value;   //   value[0] , value[1], .... value[ntok-1]
 
 
@@ -83,6 +83,13 @@ local int nemoinprt(char *line, real *par, int npar)
     curr = (lls *) allocate(sizeof(lls));
     curr->val = atof(token);
     sum += curr->val;
+
+    if (ntok == 0) {
+      start = curr;
+    } else if (ntok == npar - 1) {
+      end = curr;
+    }
+
     curr->next = NULL;
 
     prev = curr;
