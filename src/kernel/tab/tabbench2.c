@@ -20,9 +20,9 @@
 string defv[] = {
     "in=???\n	       input file",
     "out=\n            output file",
-    "mode=1\n          Benchmark mode",
+    "mode=0\n          Benchmark mode",
     "nmax=10000\n      Default max allocation (not used)",
-    "VERSION=0.4\n     25-jul-2020 PJT",
+    "VERSION=0.5\n     25-jul-2020 PJT",
     NULL,
 };
 
@@ -34,11 +34,12 @@ string usage="table I/O benchmark";
 
 #define MAXPAR 16
 
+// these should go in some header file
 extern int inifie(string);
 extern void dofie(real *, int *, real *, real *);
 
-// testing another method of parsing
-// NEMO's burststring() based version is 59" compared to 92" in this strtok() based version
+// testing another method of parsing:
+// NEMO's burststring() based version is 50% faster than this strtok() based version
 // Q: is there a fancy sscanf method possible?
 //    input :   *line
 //    input :   *par
@@ -51,7 +52,7 @@ typedef struct lls {
   real val;
   struct lls *next;
 } lls;
-
+static real sum = 0;
 
 //local int nemoinprt(char *line, real **par, int *npar)
   
@@ -63,7 +64,7 @@ local int nemoinprt(char *line, real *par, int npar)
   //     *  0  *  0
   char *token = strtok(line," ,");
   int ntok = 0;
-  lls first, last;
+  lls *curr, *prev = NULL;
   real *value;   //   value[0] , value[1], .... value[ntok-1]
 
 
@@ -77,15 +78,25 @@ local int nemoinprt(char *line, real *par, int npar)
       error("too many");
       return ntok;
     }
-    par[ntok++] = atof(token);
-    token = strtok(NULL," ,");
+    //par[ntok++] = atof(token);
+    //token = strtok(NULL," ,");
+    curr = (lls *) allocate(sizeof(lls));
+    curr->val = atof(token);
+    sum += curr->val;
+    curr->next = NULL;
+
+    prev = curr;
+    curr = curr->next;
+    ++ntok;
+
+    token = strtok(NULL, " ,");
   }
 
 
   /* walk through the list of ntok elements , allocate *value
      and place the token pointers here
   */
-  value = (real *) allocate(ntok * sizeof(real));
+  /* value = (real *) allocate(ntok * sizeof(real)); */
 
 
   /* if ntok <= npar; fill those elements of the par[] */
@@ -100,13 +111,14 @@ local int nemoinprt(char *line, real *par, int npar)
 
 void nemo_main(void)
 {
+    bool Qout = hasvalue("out");
     stream istr, ostr;
     int nmax,  *select = NULL;
     int nout, next = 0;
     int    npar, one = 1;
     size_t nlines;
     string iname = getparam("in");
-    real par[MAXPAR], retval, errval, sum;
+    real par[MAXPAR], retval, errval;
     int mode = getiparam("mode");
     size_t linelen = MAX_LINELEN;
     //char line[MAX_LINELEN];
@@ -116,7 +128,7 @@ void nemo_main(void)
     dprintf(0,"MAX_LINELEN=%d\n",MAX_LINELEN);
 
     istr = stropen(getparam("in"),"r");
-    ostr = stropen(getparam("out"),"w");
+    if (Qout) ostr = stropen(getparam("out"),"w");
 
     nlines = 0;
     sum = 0.0;
@@ -129,13 +141,13 @@ void nemo_main(void)
       //while (fgets(line,MAX_LINELEN,istr) != NULL)
       while (getline(&line, &linelen, istr) != -1) {
 	nlines++;
-	if (mode == 0) fputs(line,ostr);
+	if (Qout && mode == 0) fputs(line,ostr);
       }
     } else if (mode == 1) {
         dprintf(0,"nemoinp to split line\n");      
         while (getline(&line, &linelen, istr) != -1) {
 	  nlines++;
-	  npar = my_nemoinpr(line,par,MAXPAR);	
+	  npar = my_nemoinpr(line,par,MAXPAR);
 	}
     } else if (mode == 2) {
         dprintf(0,"nemoinp + sqrt()\n");            
@@ -143,7 +155,8 @@ void nemo_main(void)
 	  nlines++;
 	  npar = my_nemoinpr(line,par,MAXPAR);	
 	  retval = sqrt(par[0]*par[0] + par[1]*par[1] + par[2]*par[2]);
-	  sum += retval;	  
+	  sum += retval;
+	  if (Qout) fprintf(ostr,"%s %g\n",line,retval);
 	}
     } else if (mode == 3) {
         dprintf(0,"nemoinp + fie(sqrt())\n");                  
@@ -151,12 +164,13 @@ void nemo_main(void)
 	  nlines++;
 	  npar = my_nemoinpr(line,par,MAXPAR);	
 	  dofie(par,&one,&retval,&errval);
-	  sum += retval;	  
+	  sum += retval;
+	  if (Qout) fprintf(ostr,"%s %g\n",line,retval);	  
 	}
     }
 
     strclose(istr);
-    strclose(ostr);
+    if (Qout) strclose(ostr);
     
     dprintf(0,"sum=%g\n",sum);
     dprintf(0,"Read %ld lines\n",nlines);
@@ -167,19 +181,20 @@ void nemo_main(void)
 // tabgen tab2 10000000  3
 // tabgen tab3 100000000 3
 // tabgen tab4 3 100000000
-//
+
+// fgets method on tab3: (cpu times approx. due to laptop variations)
+//       BS    ST
+// -1   1.9   1.8
+//  0   3.3   3.2
+//  1  25.9  40.6
+//  2  26.6  38.7
+//  3  31.2  43.2
+
 //      /usr/bin/time tabbench2 tab2 . -1
 //      /usr/bin/time tabbench2 tab2 . 0
 //      /usr/bin/time tabbench2 tab2 . 1
 //      /usr/bin/time tabbench2 tab2 . 2
 //      /usr/bin/time tabbench2 tab2 . 3
-
-// fgets method on tab3:
-// -1               1.9  1.9  2.0  
-//  0               3.2  3.1  3.1
-//  1 24.0 24.3    24.0 27.6 25.7 26.3 27.4 26.9 24.4 25.6 28.8 28.6
-//  2 25.9 26.4    28.9 27.7 28.1 26.1 27.5 28.0 27.7 28.5 28.6 
-//  3 28.0         32.4 32.7 33.2 31.6 28.3 28.1 33.4 33.6 34.4
 
 // e.g. tabgen tab3    80 sec ->  34 MB/sec ( low level I/O :   435 MB/sec )
 
