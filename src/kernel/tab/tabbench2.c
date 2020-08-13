@@ -53,6 +53,8 @@ typedef struct lls {
   struct lls *next;
 } lls;
 static real sum = 0;
+static real *value;   //   value[0] , value[1], .... value[ntok-1]
+static int size_of_value = 0;
 
 //local int nemoinprt(char *line, real **par, int *npar)
   
@@ -63,32 +65,31 @@ local int nemoinprt(char *line, real *par, int npar)
   //    'AAA   BBB     CCCC'
   //     *  0  *  0
   char *token = strtok(line," ,");
-  int ntok = 0;
-  lls *curr, *prev = NULL, *start, *end;
-  real *value;   //   value[0] , value[1], .... value[ntok-1]
+  int ntok = 0, counter, start_index;
+  lls *curr, *prev = NULL, *start;
 
-
-  /*      tokenize and build linked list */
-
-  //first.val = atof(token);
-  //first.next = NULL;
+  /* tokenize and build linked list */
 
   while (token != NULL) {
-    if (ntok == npar) {
-      error("too many");
-      return ntok;
-    }
     //par[ntok++] = atof(token);
     //token = strtok(NULL," ,");
+
+    /* if (ntok == 0) {
+      start = (lls *) allocate((ntok + 1) * sizeof(lls));
+    } else {
+      start = (lls *) reallocate(start, (ntok + 1) * sizeof(lls));
+    } 
+
+    curr = &(start[ntok]); */
+
     curr = (lls *) allocate(sizeof(lls));
-    curr->val = atof(token);
-    sum += curr->val;
 
     if (ntok == 0) {
       start = curr;
-    } else if (ntok == npar - 1) {
-      end = curr;
     }
+
+    curr->val = atof(token);
+    sum += curr->val;
 
     curr->next = NULL;
 
@@ -103,8 +104,27 @@ local int nemoinprt(char *line, real *par, int npar)
   /* walk through the list of ntok elements , allocate *value
      and place the token pointers here
   */
-  /* value = (real *) allocate(ntok * sizeof(real)); */
 
+  if (value == NULL) {
+    value = (real *) allocate(ntok * sizeof(real));
+    start_index = 0;
+  } else {
+    value = (real *) reallocate(value, size_of_value + ntok * sizeof(real));
+    start_index = size_of_value;
+  }
+
+  // parse the linked list and copy over the values into an array for quick indexing
+  curr = start;
+  for (counter = start_index; counter < start_index + ntok; ++counter) {
+    value[counter] = curr->val;
+    curr = curr->next;
+  }
+
+  // size_of_value will keep track of the number of elements to skip past when adding new elements
+  size_of_value += ntok;
+
+  // free the linked list memory
+  free(start);
 
   /* if ntok <= npar; fill those elements of the par[] */
   /* put warning if not , and only fill first npar */
@@ -153,9 +173,9 @@ void nemo_main(void)
     } else if (mode == 1) {
         dprintf(0,"nemoinp to split line\n");      
         while (getline(&line, &linelen, istr) != -1) {
-	  nlines++;
-	  npar = my_nemoinpr(line,par,MAXPAR);
-	}
+	        nlines++;
+	        npar = my_nemoinpr(line,par,MAXPAR);
+	      }
     } else if (mode == 2) {
         dprintf(0,"nemoinp + sqrt()\n");            
         while (getline(&line, &linelen, istr) != -1) {	  
@@ -181,6 +201,8 @@ void nemo_main(void)
     
     dprintf(0,"sum=%g\n",sum);
     dprintf(0,"Read %ld lines\n",nlines);
+
+    free(value); // always free all allocated memory
 }
 
 // bench:
